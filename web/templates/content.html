@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>个人知识库</title>
+    <!-- 两个任选一个 github pages -->
+    <link type="text/css" href="https://cdn.jsdelivr.net/gh/MorFansLab/LiteWebChat_Frame/dist/css/litewebchat.min.css" rel="stylesheet"/>
+    <link type="text/css" href="https://cdn.jsdelivr.net/gh/MorFansLab/LiteWebChat_Frame/dist/css/litewebchat_input.min.css" rel="stylesheet"/>
+    <!-- 引入 layui.css -->
+    <link rel="stylesheet" href="//unpkg.com/layui@2.6.8/dist/css/layui.css">
+    <style>
+        html,
+        body {
+          height: 100%;
+          margin: 0;
+          padding: 0;
+          overflow: hidden;
+        }
+
+        /* 手动指定其父容器大小 */
+        .lite-chatmaster {
+          height: 100%;
+          width: 100%;
+        }
+        .layui-tab-item {
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+<div class="layui-tab layui-tab-brief" lay-filter="docDemoTabBrief" style="height: 100%">
+  <ul class="layui-tab-title">
+    <li class="layui-this">聊天</li>
+    <li>文本添加</li>
+    <li>数据管理</li>
+  </ul>
+  <div class="layui-tab-content" style="height: 90%">
+      <div class="layui-tab-item layui-show">
+        <!-- 父容器 -->
+        <div class="lite-chatmaster">
+            <!-- 聊天栏 -->
+            <div class="lite-chatbox"></div>
+            <!-- 输入框 -->
+            <div class="lite-chatinput">
+                <!-- 分界线 -->
+                <hr class="boundary" />
+                <!-- 文字输入框 -->
+                <button class="send" id="send_message">发送</button>
+                <button class="send" id="clear_context">清除上下文</button>
+                <div aria-label="input area" id="chatinput" class="editor chatinput" contenteditable="true" ref="editor"></div>
+            </div>
+        </div>
+      </div>
+      <div class="layui-tab-item">
+        <form class="layui-form" action="javascript:void(0)">
+          <div class="layui-form-item"><label class="layui-form-label">网址</label><div class="layui-input-block"><input type="text" name="url" placeholder="输入爬取的网址" autocomplete="off" class="layui-input"></div></div>
+          <div class="layui-form-item"><label class="layui-form-label">爬取元素id</label><div class="layui-input-block"><input type="text" name="id" placeholder="HTML标签的id值" autocomplete="off" class="layui-input"></div></div>
+          <div class="layui-form-item"><label class="layui-form-label">文本</label><div class="layui-input-block"><textarea style="height: 400px" id="text-content" name="content" placeholder="请输入内容" class="layui-textarea"></textarea></div></div>
+          <div class="layui-form-item">
+            <div class="layui-input-block">
+              <button class="layui-btn" lay-submit lay-filter="web">爬取网页</button>
+              <button class="layui-btn" lay-submit lay-filter="text">添加文本</button>
+              <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="layui-tab-item">
+          <table id="data-list" lay-filter="test"></table>
+      </div>
+  </div>
+</div>
+
+<!-- 引入 layui.js -->
+<script src="https://cdn.bootcdn.net/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="//unpkg.com/layui@2.6.8/dist/layui.js">
+<script src="https://cdn.jsdelivr.net/gh/MorFansLab/LiteWebChat_Frame/dist/js/litewebchat_input.min.js"></script>
+<!-- 渲染 -->
+<script src="https://cdn.jsdelivr.net/gh/MorFansLab/LiteWebChat_Frame/dist/js/litewebchat_render.min.js"></script>
+<!-- 抽离的聊天信息组件 -->
+<!--<script src="https://cdn.jsdelivr.net/gh/MorFansLab/LiteWebChat_Frame/lite-chatbox.min.js"></script>-->
+<script>
+  const htmls = [{messageType: "text", headIcon: "/static/avatar.jpg", name: "小游", position: "left", html: "你好，请问你有啥问题？"}];
+  function addMessage(message) {
+      htmls.push(message)
+      beforeRenderingHTML(htmls, ".lite-chatbox");
+  }
+  function sendPostRequest(url, data, success) {
+      $.ajax({ type: "POST", url: url,
+        data: JSON.stringify(data), // 将 JSON 数据转换为字符串
+        contentType: "application/json", // 指定请求的内容类型为 JSON
+        dataType: "json", // 指定响应的内容类型为 JSON
+        success: success
+      });
+  }
+  beforeRenderingHTML(htmls, ".lite-chatbox");
+</script>
+<script type="text/html" id="content-bar">
+  <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</a>
+</script>
+<script>
+    // 发送消息
+    $("#send_message").on('click', function() {
+        let input = $("#chatinput")
+        question = input.text()
+        sendPostRequest("/chat/ask", {question}, function(response) {
+            addMessage({messageType: "text", headIcon: "/static/avatar.jpg", name: "小游", position: "left", html: response.answer})
+        })
+        addMessage({messageType: "text", headIcon: "/static/momo.jpg", name: "用户", position: "right", html: question});
+        input.text("")
+    })
+    // 清除上下文
+    $("#clear_context").on('click', function() {
+        sendPostRequest("/chat/clear",{},function (respose) {
+            $(".lite-chatbox").empty()
+            addMessage({messageType: "text", headIcon: "/static/avatar.jpg", name: "小游", position: "left", html: "已清除上下文，请继续提问吧！"})
+        })
+    })
+    // 爬取网页
+    layui.use('form', function() {
+        var form = layui.form;
+        // 网页数据
+        form.on('submit(web)', function (data) {
+            sendPostRequest("/content/web", data.field, function(response) {
+                layer.msg("爬取成功");
+                $('#text-content').val(response.content);
+            })
+            return true
+        })
+        // 普通文本
+        form.on('submit(text)', function (data) {
+            sendPostRequest("/content/text", data.field, function(response) {
+                layer.msg("添加成功");
+                $('#text-content').val("");
+            })
+            return true
+        })
+    })
+    layui.use('table', function(){
+        var table = layui.table;
+        // 表格渲染
+        table.render({elem: '#data-list', id: "data", url: '/db/get',page: true ,cols: [[
+            {field: 'id', title: 'ID', width:80},
+            {field: 'content', title: '内容'},
+            {field: 'url', title: 'url', width:80},
+            {fixed: 'right', width:150, align:'center', toolbar: '#content-bar'}
+        ]]});
+        //工具条事件
+        table.on('tool(test)', function(obj) {
+            console.log(obj)
+            let data = obj.data;
+            if (obj.event === 'del') {
+                $.ajax({ type: "GET", url: `db/delete?id=${data.id}`, success: () => {
+                    table.reload('data', {})
+                }});
+            }
+        })
+    });
+</script>
+</body>
+</html>
